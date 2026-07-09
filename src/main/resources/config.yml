@@ -1,0 +1,13 @@
+# Decatron Rucksack - Configuración principal
+# Documentación: https://rucksack.decatron.net
+
+storage:
+  type: sqlite  # sqlite | mysql | h2
+  mysql:
+    host: localhost
+    port: 3306
+    database: rucksack
+    username: root
+    password: ''
+
+language: es  # es | en

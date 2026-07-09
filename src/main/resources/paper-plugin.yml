@@ -1,0 +1,11 @@
+name: DecatronRucksack
+version: '0.1.0-SNAPSHOT'
+main: net.decatron.rucksack.RucksackPlugin
+api-version: '1.21'
+description: Backpack plugin for Paper 1.21.x+
+author: Decatron
+website: https://rucksack.decatron.net
+
+dependencies:
+  server:
+    # Sin dependencias externas por ahora
