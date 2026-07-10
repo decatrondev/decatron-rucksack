@@ -44,7 +44,7 @@ public class SQLiteStorage implements BackpackStorage {
         String url  = "jdbc:sqlite:" + dbFile.getAbsolutePath();
 
         // Cargar driver relocado
-        Class.forName("net.decatron.rucksack.libs.sqlite.JDBC");
+        Class.forName("org.sqlite.JDBC");
 
         connection = DriverManager.getConnection(url);
         connection.setAutoCommit(true);

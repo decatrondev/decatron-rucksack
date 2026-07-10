@@ -58,8 +58,8 @@
                 </configuration>
             </plugin>
 
-            <!-- Shade: empaqueta sqlite-jdbc dentro del jar y reloca el paquete
-                 para evitar conflictos si otro plugin carga su propia versión de SQLite -->
+            <!-- Shade: empaqueta sqlite-jdbc dentro del jar sin relocar
+                 (SQLite usa librerias nativas que no pueden relocarse) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -70,12 +70,6 @@
                         <goals><goal>shade</goal></goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <relocations>
-                                <relocation>
-                                    <pattern>org.sqlite</pattern>
-                                    <shadedPattern>net.decatron.rucksack.libs.sqlite</shadedPattern>
-                                </relocation>
-                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
