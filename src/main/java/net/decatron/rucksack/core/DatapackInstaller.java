@@ -29,6 +29,8 @@ public class DatapackInstaller {
         File datapacksDir = new File(world.getWorldFolder(), "datapacks");
         File targetDir = new File(datapacksDir, "decatron-rucksack");
 
+        boolean firstInstall = !targetDir.exists();
+
         try {
             // Instalar/actualizar archivos del datapack
             for (String resourcePath : DATAPACK_FILES) {
@@ -39,26 +41,32 @@ public class DatapackInstaller {
                 try (InputStream in = plugin.getResource(resourcePath);
                      OutputStream out = new FileOutputStream(targetFile)) {
                     if (in == null) {
-                        plugin.getLogger().warning("[DatapackInstaller] Recurso no encontrado: " + resourcePath);
+                        plugin.getLogger().warning("[DatapackInstaller] Resource not found: " + resourcePath);
                         continue;
                     }
                     in.transferTo(out);
                 }
             }
 
-            plugin.getLogger().info("[DatapackInstaller] Datapack instalado en: " + targetDir.getPath());
-
-            // Ejecutar setup con 1 tick de delay para que el datapack esté cargado
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                plugin.getServer().dispatchCommand(
-                    plugin.getServer().getConsoleSender(),
-                    "function decatron:setup"
-                );
-                plugin.getLogger().info("[DatapackInstaller] Setup ejecutado automaticamente.");
-            }, 20L); // 1 segundo de delay
+            if (firstInstall) {
+                // Primera instalacion — el server debe reiniciarse para cargar el datapack
+                plugin.getLogger().warning("************************************************************");
+                plugin.getLogger().warning("* Decatron Rucksack: DATAPACK INSTALLED FOR THE FIRST TIME");
+                plugin.getLogger().warning("* Please RESTART the server to activate recipes and crafting.");
+                plugin.getLogger().warning("************************************************************");
+            } else {
+                // Ya estaba instalado — solo ejecutar setup
+                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                    plugin.getServer().dispatchCommand(
+                        plugin.getServer().getConsoleSender(),
+                        "function decatron:setup"
+                    );
+                    plugin.getLogger().info("[DatapackInstaller] Setup executed automatically.");
+                }, 20L);
+            }
 
         } catch (IOException e) {
-            plugin.getLogger().severe("[DatapackInstaller] Error al instalar datapack: " + e.getMessage());
+            plugin.getLogger().severe("[DatapackInstaller] Error installing datapack: " + e.getMessage());
         }
     }
 }
