@@ -9,4 +9,4 @@ website: https://rucksack.decatron.net
 commands:
   rucksack:
     description: Abre tu mochila
-    usage: /rucksack
+    usage: /rucksack [give <tier>]

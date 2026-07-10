@@ -5,11 +5,13 @@ import net.decatron.rucksack.core.RucksackManager;
 import net.decatron.rucksack.data.Backpack;
 import net.decatron.rucksack.data.StorageManager;
 import net.decatron.rucksack.gui.GuiManager;
+import net.decatron.rucksack.util.BackpackItemUtil;
 import net.decatron.rucksack.util.TierConfig;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 public class CommandManager implements RucksackManager {
 
@@ -50,6 +52,23 @@ public class CommandManager implements RucksackManager {
         public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("\u00a7cEste comando solo puede ejecutarlo un jugador.");
+                return true;
+            }
+
+            // /rucksack give [tier] — da el item fisico con PDC correcto
+            if (args.length >= 1 && args[0].equalsIgnoreCase("give")) {
+                TierConfig tier = TierConfig.LEATHER;
+                if (args.length >= 2) {
+                    try {
+                        tier = TierConfig.fromId(args[1].toLowerCase());
+                    } catch (Exception e) {
+                        player.sendMessage("\u00a7cTier invalido. Usa: leather, iron, diamond, netherite");
+                        return true;
+                    }
+                }
+                ItemStack backpackItem = BackpackItemUtil.createBackpackItem(tier);
+                player.getInventory().addItem(backpackItem);
+                player.sendMessage("\u00a7aRecibiste: " + tier.getDisplayName());
                 return true;
             }
 
