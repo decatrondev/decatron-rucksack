@@ -16,3 +16,8 @@ resourcepack:
   enabled: true
   url: ''       # URL publica del resource pack .zip (dejar vacio durante desarrollo)
   force: true   # Si true, kickea al jugador si rechaza el resource pack
+
+# Tecla configurable para abrir mochila via /trigger:
+# 1. Copia plugins/Rucksack/datapack/ a world/datapacks/
+# 2. Ejecuta /reload en el servidor
+# 3. En Minecraft: Opciones > Controles > busca "trigger mochila" y asigna tu tecla (por defecto B)

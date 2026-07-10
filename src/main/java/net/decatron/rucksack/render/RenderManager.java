@@ -15,6 +15,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -48,6 +49,9 @@ public class RenderManager implements RucksackManager {
         // Registrar todos los listeners de render
         plugin.getServer().getPluginManager().registerEvents(new RenderListener(), plugin);
         plugin.getLogger().info("[RenderManager] Inicializado — listeners registrados.");
+
+        // Extraer datapack a plugins/Rucksack/datapack/
+        extractDatapack();
 
         // Verificar configuracion del resource pack
         boolean rpEnabled = configManager.getConfig().getBoolean("resourcepack.enabled", true);
@@ -125,6 +129,34 @@ public class RenderManager implements RucksackManager {
         }
 
         /**
+         * Detecta /trigger mochila (con o sin valor).
+         * Completamente invisible en el chat — el jugador asigna su tecla
+         * favorita en Minecraft > Controles a este comando.
+         */
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
+            String msg = event.getMessage().toLowerCase().trim();
+            if (!msg.equals("/trigger mochila") && !msg.startsWith("/trigger mochila ")) return;
+
+            Player player = (Player) event.getPlayer();
+
+            // Cancelar para que no se procese como comando normal
+            event.setCancelled(true);
+
+            // Verificar que tiene mochila equipada
+            ItemStack chestSlot = player.getInventory().getChestplate();
+            Optional<TierConfig> tierOpt = BackpackItemUtil.getBackpackTier(chestSlot);
+
+            if (tierOpt.isEmpty()) {
+                // No tiene mochila equipada — silencioso
+                return;
+            }
+
+            // Abrir el GUI
+            openBackpackGui(player, tierOpt.get());
+        }
+
+        /**
          * Al morir: la mochila cae como item con su PDC intacto.
          * El contenido sigue guardado en DB — al recoger el item y abrirlo
          * con /rucksack se cargan los datos automaticamente.
@@ -177,6 +209,39 @@ public class RenderManager implements RucksackManager {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private void extractDatapack() {
+        java.io.File datapackDir = new java.io.File(plugin.getDataFolder(), "datapack");
+        if (!datapackDir.exists()) {
+            datapackDir.mkdirs();
+        }
+
+        String[] datapackFiles = {
+            "datapack/pack.mcmeta",
+            "datapack/data/decatron/function/setup.mcfunction"
+        };
+
+        for (String resourcePath : datapackFiles) {
+            java.io.File dest = new java.io.File(plugin.getDataFolder().getPath() + "/" + resourcePath);
+            if (!dest.getParentFile().exists()) {
+                dest.getParentFile().mkdirs();
+            }
+            if (!dest.exists()) {
+                try (java.io.InputStream in = plugin.getResource(resourcePath)) {
+                    if (in == null) {
+                        plugin.getLogger().warning("[RenderManager] No se encontro el recurso: " + resourcePath);
+                        continue;
+                    }
+                    java.nio.file.Files.copy(in, dest.toPath());
+                } catch (Exception e) {
+                    plugin.getLogger().warning("[RenderManager] Error al extraer " + resourcePath + ": " + e.getMessage());
+                }
+            }
+        }
+
+        plugin.getLogger().info("[RenderManager] Datapack extraido en plugins/Rucksack/datapack/ " +
+                "— copialo a la carpeta datapacks/ de tu mundo y ejecuta /reload para activar el trigger.");
+    }
 
     private void openBackpackGui(Player player, TierConfig tier) {
         storageManager.getStorage()
