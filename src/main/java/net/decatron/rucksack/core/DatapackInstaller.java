@@ -29,14 +29,26 @@ public class DatapackInstaller {
         File datapacksDir = new File(world.getWorldFolder(), "datapacks");
         File targetDir = new File(datapacksDir, "decatron-rucksack");
 
+        plugin.getLogger().info("[DatapackInstaller] World folder: " + world.getWorldFolder().getAbsolutePath());
+        plugin.getLogger().info("[DatapackInstaller] Datapacks dir: " + datapacksDir.getAbsolutePath());
+        plugin.getLogger().info("[DatapackInstaller] Target dir: " + targetDir.getAbsolutePath());
+        plugin.getLogger().info("[DatapackInstaller] Target dir exists: " + targetDir.exists());
+
         boolean firstInstall = !targetDir.exists();
 
         try {
             // Crear carpetas base si no existen
-            if (!datapacksDir.exists()) datapacksDir.mkdirs();
-            if (!targetDir.exists() && !targetDir.mkdirs()) {
-                plugin.getLogger().severe("[DatapackInstaller] Could not create directory: " + targetDir.getAbsolutePath());
-                return;
+            if (!datapacksDir.exists()) {
+                plugin.getLogger().info("[DatapackInstaller] Creating datapacks dir...");
+                datapacksDir.mkdirs();
+            }
+            if (!targetDir.exists()) {
+                plugin.getLogger().info("[DatapackInstaller] Creating decatron-rucksack dir...");
+                if (!targetDir.mkdirs()) {
+                    plugin.getLogger().severe("[DatapackInstaller] Could not create directory: " + targetDir.getAbsolutePath());
+                    return;
+                }
+                plugin.getLogger().info("[DatapackInstaller] Directory created OK.");
             }
 
             // Limpiar archivos sueltos dejados por versiones anteriores del plugin
