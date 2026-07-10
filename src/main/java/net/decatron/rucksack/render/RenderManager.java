@@ -83,32 +83,42 @@ public class RenderManager implements RucksackManager {
 
             Player player = event.getPlayer();
             ItemStack inHand = event.getItem();
-            if (inHand == null) return;
+            ItemStack chestSlot = player.getInventory().getChestplate();
 
+            // CASO 1: Shift + click derecho con mano vacia o cualquier item
+            // Si tiene mochila equipada en pechera → abrir GUI
+            if (player.isSneaking()) {
+                Optional<TierConfig> equippedOpt = BackpackItemUtil.getBackpackTier(chestSlot);
+                if (equippedOpt.isPresent()) {
+                    event.setCancelled(true);
+                    openBackpackGui(player, equippedOpt.get());
+                    return;
+                }
+            }
+
+            // CASO 2: Click derecho con mochila EN MANO
+            if (inHand == null) return;
             Optional<TierConfig> tierOpt = BackpackItemUtil.getBackpackTier(inHand);
             if (tierOpt.isEmpty()) return;
 
             TierConfig tier = tierOpt.get();
-
-            // Cancelar para evitar que el item interactue con el mundo
             event.setCancelled(true);
 
-            ItemStack chestSlot = player.getInventory().getChestplate();
-
-            if (chestSlot == null || chestSlot.getType().isAir()) {
-                // Slot de pechera vacio: equipar la mochila
+            if (player.isSneaking()) {
+                // Shift + click derecho con mochila en mano → abrir GUI directamente
+                openBackpackGui(player, tier);
+            } else if (chestSlot == null || chestSlot.getType().isAir()) {
+                // Click derecho normal + pechera vacia → equipar
                 player.getInventory().setChestplate(inHand.clone());
-                // Quitar el item de la mano
                 inHand.subtract(1);
                 player.sendMessage("\u00a7aEquipaste tu " + tier.getDisplayName() + "\u00a7a.");
             } else {
-                // Verificar si lo que tiene en pechera ES la mochila (por PDC)
                 Optional<TierConfig> equippedOpt = BackpackItemUtil.getBackpackTier(chestSlot);
                 if (equippedOpt.isPresent()) {
-                    // Ya tiene la mochila equipada — abrir el GUI
+                    // Tiene mochila equipada → abrir GUI
                     openBackpackGui(player, equippedOpt.get());
                 } else {
-                    // Tiene otra pechera — informar al jugador
+                    // Tiene otra pechera puesta
                     player.sendMessage("\u00a7cDebes quitar tu pechera antes de equipar la mochila.");
                 }
             }
