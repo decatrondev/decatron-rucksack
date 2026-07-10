@@ -53,8 +53,6 @@ public class RenderManager implements RucksackManager {
         plugin.getServer().getPluginManager().registerEvents(new RenderListener(), plugin);
         plugin.getLogger().info("[RenderManager] Inicializado — listeners registrados.");
 
-        // Extraer datapack a plugins/Rucksack/datapack/
-        extractDatapack();
 
         // Verificar que el ResourcePackManager esta listo
         boolean rpEnabled = configManager.getConfig().getBoolean("resourcepack.enabled", true);
@@ -219,38 +217,6 @@ public class RenderManager implements RucksackManager {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private void extractDatapack() {
-        java.io.File datapackDir = new java.io.File(plugin.getDataFolder(), "datapack");
-        if (!datapackDir.exists()) {
-            datapackDir.mkdirs();
-        }
-
-        String[] datapackFiles = {
-            "datapack/pack.mcmeta",
-            "datapack/data/decatron/function/setup.mcfunction"
-        };
-
-        for (String resourcePath : datapackFiles) {
-            java.io.File dest = new java.io.File(plugin.getDataFolder().getPath() + "/" + resourcePath);
-            if (!dest.getParentFile().exists()) {
-                dest.getParentFile().mkdirs();
-            }
-            if (!dest.exists()) {
-                try (java.io.InputStream in = plugin.getResource(resourcePath)) {
-                    if (in == null) {
-                        plugin.getLogger().warning("[RenderManager] No se encontro el recurso: " + resourcePath);
-                        continue;
-                    }
-                    java.nio.file.Files.copy(in, dest.toPath());
-                } catch (Exception e) {
-                    plugin.getLogger().warning("[RenderManager] Error al extraer " + resourcePath + ": " + e.getMessage());
-                }
-            }
-        }
-
-        plugin.getLogger().info("[RenderManager] Datapack extraido en plugins/Rucksack/datapack/ " +
-                "— copialo a la carpeta datapacks/ de tu mundo y ejecuta /reload para activar el trigger.");
-    }
 
     private void openBackpackGui(Player player, TierConfig tier) {
         storageManager.getStorage()

@@ -12,6 +12,8 @@ public final class RucksackPlugin extends JavaPlugin {
         getLogger().info("Decatron Rucksack v" + getDescription().getVersion() + " — iniciando...");
         pluginCore = new PluginCore(this);
         pluginCore.initialize();
+        // Instalar datapack automaticamente en la carpeta del mundo
+        new net.decatron.rucksack.core.DatapackInstaller(this).installAndSetup();
         getLogger().info("Decatron Rucksack habilitado correctamente.");
     }
 
