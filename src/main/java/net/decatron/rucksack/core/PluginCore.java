@@ -13,13 +13,13 @@ public class PluginCore {
 
     private final RucksackPlugin plugin;
 
-    private final ConfigManager  configManager;
-    private final StorageManager storageManager;
-    private final LicenseManager licenseManager;
-    private final GuiManager     guiManager;
-    private final RenderManager  renderManager;
+    private final ConfigManager   configManager;
+    private final StorageManager  storageManager;
+    private final LicenseManager  licenseManager;
+    private final GuiManager      guiManager;
+    private final RenderManager   renderManager;
     private final ListenerManager listenerManager;
-    private final CommandManager commandManager;
+    private final CommandManager  commandManager;
 
     public PluginCore(RucksackPlugin plugin) {
         this.plugin = plugin;
@@ -29,7 +29,10 @@ public class PluginCore {
         this.storageManager  = new StorageManager(plugin, configManager);
         this.licenseManager  = new LicenseManager(plugin);
         this.guiManager      = new GuiManager(plugin, storageManager);
-        this.renderManager   = new RenderManager(plugin);
+
+        // RenderManager recibe configManager, guiManager y storageManager
+        this.renderManager   = new RenderManager(plugin, configManager, guiManager, storageManager);
+
         this.listenerManager = new ListenerManager(plugin);
         this.commandManager  = new CommandManager(plugin, guiManager, storageManager);
     }
@@ -59,11 +62,11 @@ public class PluginCore {
     }
 
     // Getters para inyeccion en fases siguientes
-    public ConfigManager  getConfigManager()    { return configManager; }
-    public StorageManager getStorageManager()   { return storageManager; }
-    public LicenseManager getLicenseManager()   { return licenseManager; }
-    public GuiManager     getGuiManager()       { return guiManager; }
-    public RenderManager  getRenderManager()    { return renderManager; }
-    public ListenerManager getListenerManager() { return listenerManager; }
-    public CommandManager getCommandManager()   { return commandManager; }
+    public ConfigManager   getConfigManager()    { return configManager; }
+    public StorageManager  getStorageManager()   { return storageManager; }
+    public LicenseManager  getLicenseManager()   { return licenseManager; }
+    public GuiManager      getGuiManager()       { return guiManager; }
+    public RenderManager   getRenderManager()    { return renderManager; }
+    public ListenerManager getListenerManager()  { return listenerManager; }
+    public CommandManager  getCommandManager()   { return commandManager; }
 }

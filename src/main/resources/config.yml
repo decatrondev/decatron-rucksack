@@ -1,5 +1,5 @@
-# Decatron Rucksack - Configuración principal
-# Documentación: https://rucksack.decatron.net
+# Decatron Rucksack - Configuracion principal
+# Documentacion: https://rucksack.decatron.net
 
 storage:
   type: sqlite  # sqlite | mysql | h2
@@ -11,3 +11,8 @@ storage:
     password: ''
 
 language: es  # es | en
+
+resourcepack:
+  enabled: true
+  url: ''       # URL publica del resource pack .zip (dejar vacio durante desarrollo)
+  force: true   # Si true, kickea al jugador si rechaza el resource pack

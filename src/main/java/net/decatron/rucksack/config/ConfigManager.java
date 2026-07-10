@@ -30,4 +30,11 @@ public class ConfigManager implements RucksackManager {
     public String getLanguage() {
         return plugin.getConfig().getString("language", "es");
     }
+
+    /**
+     * Retorna la configuracion del plugin (delegada al plugin principal).
+     */
+    public org.bukkit.configuration.file.FileConfiguration getConfig() {
+        return plugin.getConfig();
+    }
 }
