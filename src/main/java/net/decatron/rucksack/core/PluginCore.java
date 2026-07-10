@@ -28,10 +28,10 @@ public class PluginCore {
         this.configManager   = new ConfigManager(plugin);
         this.storageManager  = new StorageManager(plugin, configManager);
         this.licenseManager  = new LicenseManager(plugin);
-        this.guiManager      = new GuiManager(plugin);
+        this.guiManager      = new GuiManager(plugin, storageManager);
         this.renderManager   = new RenderManager(plugin);
         this.listenerManager = new ListenerManager(plugin);
-        this.commandManager  = new CommandManager(plugin);
+        this.commandManager  = new CommandManager(plugin, guiManager, storageManager);
     }
 
     public void initialize() {

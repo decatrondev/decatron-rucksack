@@ -9,3 +9,8 @@ website: https://rucksack.decatron.net
 dependencies:
   server:
     # Sin dependencias externas por ahora
+
+commands:
+  rucksack:
+    description: Abre tu mochila
+    usage: /rucksack
