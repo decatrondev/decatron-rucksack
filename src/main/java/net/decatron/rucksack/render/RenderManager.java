@@ -74,7 +74,7 @@ public class RenderManager implements RucksackManager {
          *  - Si el slot de pechera esta vacio: equipar la mochila.
          *  - Si el jugador ya tiene la mochila equipada en pechera: abrir el GUI.
          */
-        @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+        @EventHandler(priority = EventPriority.LOWEST)
         public void onPlayerInteract(PlayerInteractEvent event) {
             // Solo click derecho (aire o bloque), y solo con la mano principal
             if (event.getHand() != EquipmentSlot.HAND) return;
