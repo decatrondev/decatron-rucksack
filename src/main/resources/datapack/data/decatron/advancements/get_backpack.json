@@ -1,0 +1,20 @@
+{
+  "display": {
+    "icon": {"id": "minecraft:paper"},
+    "title": {"text": "¡Aventurero!"},
+    "description": {"text": "Crafteaste tu primera Rucksack"},
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "minecraft:story/obtain_armor",
+  "criteria": {
+    "craft_backpack": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "decatron:backpack_leather"
+      }
+    }
+  }
+}

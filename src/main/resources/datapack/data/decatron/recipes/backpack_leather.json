@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "LSL",
+    "LLL",
+    "LLL"
+  ],
+  "key": {
+    "L": {"item": "minecraft:leather"},
+    "S": {"item": "minecraft:string"}
+  },
+  "result": {
+    "id": "minecraft:paper",
+    "components": {
+      "minecraft:custom_model_data": 4001,
+      "minecraft:custom_name": "{\"text\":\"Mochila de Cuero\",\"color\":\"gold\",\"italic\":false}"
+    },
+    "count": 1
+  }
+}
