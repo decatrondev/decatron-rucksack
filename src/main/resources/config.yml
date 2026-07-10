@@ -14,8 +14,9 @@ language: es  # es | en
 
 resourcepack:
   enabled: true
-  url: ''       # URL publica del resource pack .zip (dejar vacio durante desarrollo)
-  force: true   # Si true, kickea al jugador si rechaza el resource pack
+  force: true
+  port: 28765          # Puerto del servidor HTTP interno que sirve el .zip
+  public-ip: ''        # IP publica del server. Si vacio, se auto-detecta
 
 # Tecla configurable para abrir mochila via /trigger:
 # 1. Copia plugins/Rucksack/datapack/ a world/datapacks/

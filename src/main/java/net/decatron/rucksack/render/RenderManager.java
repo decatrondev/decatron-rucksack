@@ -26,22 +26,25 @@ import java.util.UUID;
 
 public class RenderManager implements RucksackManager {
 
-    private final RucksackPlugin  plugin;
-    private final ConfigManager   configManager;
-    private final GuiManager      guiManager;
-    private final StorageManager  storageManager;
+    private final RucksackPlugin       plugin;
+    private final ConfigManager        configManager;
+    private final ResourcePackManager  resourcePackManager;
+    private final GuiManager           guiManager;
+    private final StorageManager       storageManager;
 
     // UUID fijo para el resource pack de Rucksack
     private static final UUID RP_UUID = UUID.fromString("a1b2c3d4-0000-0000-0000-ba5e40000001");
 
     public RenderManager(RucksackPlugin plugin,
                          ConfigManager configManager,
+                         ResourcePackManager resourcePackManager,
                          GuiManager guiManager,
                          StorageManager storageManager) {
-        this.plugin         = plugin;
-        this.configManager  = configManager;
-        this.guiManager     = guiManager;
-        this.storageManager = storageManager;
+        this.plugin              = plugin;
+        this.configManager       = configManager;
+        this.resourcePackManager = resourcePackManager;
+        this.guiManager          = guiManager;
+        this.storageManager      = storageManager;
     }
 
     @Override
@@ -53,12 +56,11 @@ public class RenderManager implements RucksackManager {
         // Extraer datapack a plugins/Rucksack/datapack/
         extractDatapack();
 
-        // Verificar configuracion del resource pack
+        // Verificar que el ResourcePackManager esta listo
         boolean rpEnabled = configManager.getConfig().getBoolean("resourcepack.enabled", true);
-        String rpUrl = configManager.getConfig().getString("resourcepack.url", "");
-        if (rpEnabled && (rpUrl == null || rpUrl.isBlank())) {
-            plugin.getLogger().warning("[RenderManager] Resource pack habilitado pero 'resourcepack.url' esta vacio. " +
-                    "El resource pack NO se enviara a los jugadores hasta que se configure la URL publica.");
+        if (rpEnabled && resourcePackManager.getUrl() == null) {
+            plugin.getLogger().warning("[RenderManager] Resource pack habilitado pero la URL no esta disponible. " +
+                    "El resource pack NO se enviara a los jugadores.");
         }
     }
 
@@ -177,27 +179,34 @@ public class RenderManager implements RucksackManager {
         }
 
         /**
-         * Al conectarse: enviar el resource pack si esta configurado.
+         * Al conectarse: enviar el resource pack si esta disponible.
          */
         @EventHandler(priority = EventPriority.MONITOR)
         public void onPlayerJoin(PlayerJoinEvent event) {
             boolean rpEnabled = configManager.getConfig().getBoolean("resourcepack.enabled", true);
             if (!rpEnabled) return;
 
-            String rpUrl = configManager.getConfig().getString("resourcepack.url", "");
-            if (rpUrl == null || rpUrl.isBlank()) return;
+            String rpUrl = resourcePackManager.getUrl();
+            if (rpUrl == null || rpUrl.isBlank()) {
+                plugin.getLogger().warning("[RenderManager] Resource pack habilitado pero URL no disponible para "
+                        + event.getPlayer().getName() + " — omitiendo.");
+                return;
+            }
 
             boolean force = configManager.getConfig().getBoolean("resourcepack.force", true);
             Player player = event.getPlayer();
 
             try {
-                Component kickMessage = force
-                        ? Component.text("\u00a7cNecesitas aceptar el resource pack de Decatron Rucksack para jugar en este servidor.")
-                        : null;
+                Component kickMessage = Component.text(
+                        "\u00a7cNecesitas el resource pack de Decatron Rucksack.");
 
-                // SHA vacio — el servidor usara el URL tal cual.
-                // En produccion, configurar un hash SHA-1 real para evitar redescargas.
-                player.setResourcePack(RP_UUID, rpUrl, (String) null, kickMessage, force);
+                player.setResourcePack(
+                        RP_UUID,
+                        rpUrl,
+                        resourcePackManager.getSha1Bytes(),
+                        kickMessage,
+                        force
+                );
 
             } catch (Exception e) {
                 plugin.getLogger().warning("[RenderManager] Error al enviar resource pack a "
