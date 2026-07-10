@@ -26,13 +26,15 @@ public class DatapackInstaller {
 
     public void installAndSetup() {
         World world = plugin.getServer().getWorlds().get(0);
-        File datapacksDir = new File(world.getWorldFolder(), "datapacks");
+        // En MC 1.21+ world.getWorldFolder() devuelve la carpeta de la dimension (world/dimensions/minecraft/overworld).
+        // Los datapacks van en la raiz del mundo (world/datapacks/), que se obtiene via getWorldContainer() + nombre.
+        File worldRoot = new File(plugin.getServer().getWorldContainer(), world.getName());
+        File datapacksDir = new File(worldRoot, "datapacks");
         File targetDir = new File(datapacksDir, "decatron-rucksack");
 
-        plugin.getLogger().info("[DatapackInstaller] World folder: " + world.getWorldFolder().getAbsolutePath());
+        plugin.getLogger().info("[DatapackInstaller] World root: " + worldRoot.getAbsolutePath());
         plugin.getLogger().info("[DatapackInstaller] Datapacks dir: " + datapacksDir.getAbsolutePath());
-        plugin.getLogger().info("[DatapackInstaller] Target dir: " + targetDir.getAbsolutePath());
-        plugin.getLogger().info("[DatapackInstaller] Target dir exists: " + targetDir.exists());
+        plugin.getLogger().info("[DatapackInstaller] Target dir: " + targetDir.getAbsolutePath() + " (exists: " + targetDir.exists() + ")");
 
         boolean firstInstall = !targetDir.exists();
 
