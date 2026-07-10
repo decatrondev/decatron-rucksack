@@ -6,8 +6,8 @@
     "LLL"
   ],
   "key": {
-    "L": {"item": "minecraft:leather"},
-    "S": {"item": "minecraft:string"}
+    "L": "minecraft:leather",
+    "S": "minecraft:string"
   },
   "result": {
     "id": "minecraft:paper",
