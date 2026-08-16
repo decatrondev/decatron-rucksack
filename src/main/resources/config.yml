@@ -12,6 +12,21 @@ storage:
 
 language: es  # es | en
 
+# Colocacion de la mochila en la espalda.
+# No edites esto a mano: entra al juego en tercera persona (F5) y usa
+#   /rucksack ajuste            -> ver valores actuales
+#   /rucksack ajuste altura +   -> mover de a un paso
+#   /rucksack ajuste paso 0.01  -> afinar el tamano del paso
+#   /rucksack ajuste guardar    -> escribir los valores aca
+render:
+  espalda:
+    separacion: 0.10   # distancia hacia atras desde la espalda
+    altura: 1.25       # altura desde los pies
+    lateral: 0.0       # corrimiento a los costados (+ derecha, - izquierda)
+    escala: 0.85       # tamano del modelo
+    giro: 180.0        # orientacion, en grados
+    inclinacion: 0.0   # inclinacion hacia adelante/atras, en grados
+
 resourcepack:
   enabled: true
   force: true

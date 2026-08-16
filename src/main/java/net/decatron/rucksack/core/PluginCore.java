@@ -37,7 +37,7 @@ public class PluginCore {
 
         // RenderManager recibe configManager, resourcePackManager, guiManager y storageManager
         this.renderManager   = new RenderManager(plugin, configManager, resourcePackManager, guiManager, storageManager);
-        this.backpackDisplayManager = new BackpackDisplayManager(plugin);
+        this.backpackDisplayManager = new BackpackDisplayManager(plugin, configManager);
 
         this.listenerManager = new ListenerManager(plugin);
         this.commandManager  = new CommandManager(plugin, guiManager, storageManager);

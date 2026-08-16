@@ -9,4 +9,9 @@ website: https://rucksack.decatron.net
 commands:
   rucksack:
     description: Abre tu mochila
-    usage: /rucksack [give <tier>]
+    usage: /rucksack [give <tier> | ajuste ...]
+
+permissions:
+  rucksack.admin:
+    description: Permite ajustar la colocacion de la mochila en vivo
+    default: op

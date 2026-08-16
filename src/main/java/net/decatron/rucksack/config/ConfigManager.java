@@ -6,16 +6,24 @@ import net.decatron.rucksack.core.RucksackManager;
 public class ConfigManager implements RucksackManager {
 
     private final RucksackPlugin plugin;
+    private final RenderSettings renderSettings;
 
     public ConfigManager(RucksackPlugin plugin) {
         this.plugin = plugin;
+        this.renderSettings = new RenderSettings(plugin);
     }
 
     @Override
     public void initialize() {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
+        renderSettings.load();
         plugin.getLogger().info("[ConfigManager] Configuracion cargada — storage=" + getStorageType() + ", language=" + getLanguage());
+        plugin.getLogger().info("[ConfigManager] Colocacion en espalda: " + renderSettings.toOneLine());
+    }
+
+    public RenderSettings getRenderSettings() {
+        return renderSettings;
     }
 
     @Override
