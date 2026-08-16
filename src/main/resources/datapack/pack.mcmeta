@@ -1,8 +1,8 @@
 {
   "pack": {
     "pack_format": 101,
-    "min_format": {"major": 101, "minor": 1},
-    "max_format": {"major": 101, "minor": 1},
+    "min_format": [101, 1],
+    "max_format": [101, 1],
     "description": "Decatron Rucksack Datapack"
   }
 }
