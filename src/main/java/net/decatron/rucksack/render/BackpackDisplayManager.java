@@ -41,8 +41,8 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     private BukkitTask followTask;
 
     private static final double BACK_OFFSET = 0.32;
-    private static final double HEIGHT_OFFSET = 0.35;
-    private static final double SNEAK_HEIGHT_DROP = 0.10;
+    private static final double HEIGHT_OFFSET = 1.25;
+    private static final double SNEAK_HEIGHT_DROP = 0.30;
 
     public BackpackDisplayManager(RucksackPlugin plugin) {
         this.plugin = plugin;
@@ -72,15 +72,38 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     // Ciclo de seguimiento
     // -------------------------------------------------------------------------
 
+    private int tickCounter = 0;
+
     private void tick() {
+        tickCounter++;
+        boolean logThisTick = (tickCounter % 100 == 0); // cada 5s aprox, solo mientras depuramos
+
+        if (logThisTick) {
+            plugin.getLogger().info("[BackpackDisplayManager] tick — mochilas activas: " + displays.size());
+        }
+
         for (Map.Entry<UUID, ItemDisplay> entry : displays.entrySet()) {
             Player player = plugin.getServer().getPlayer(entry.getKey());
             ItemDisplay display = entry.getValue();
             if (player == null || !player.isOnline() || display == null || display.isDead()) {
+                if (logThisTick) {
+                    plugin.getLogger().warning("[BackpackDisplayManager] entrada invalida para " + entry.getKey()
+                            + " (player null/offline: " + (player == null || !player.isOnline())
+                            + ", display null/dead: " + (display == null || display.isDead()) + ")");
+                }
                 continue;
             }
             updateTransform(player, display);
+            if (logThisTick) {
+                plugin.getLogger().info("[BackpackDisplayManager] " + player.getName()
+                        + " en " + formatLoc(player.getLocation())
+                        + " -> display en " + formatLoc(display.getLocation()));
+            }
         }
+    }
+
+    private String formatLoc(Location loc) {
+        return String.format("(%.2f, %.2f, %.2f) yaw=%.1f", loc.getX(), loc.getY(), loc.getZ(), loc.getYaw());
     }
 
     private void updateTransform(Player player, ItemDisplay display) {
@@ -130,8 +153,12 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
                 d.setPersistent(false);
             });
             displays.put(player.getUniqueId(), display);
+            plugin.getLogger().info("[BackpackDisplayManager] Display CREADO para " + player.getName()
+                    + " (tier=" + tier.getId() + "), total activos: " + displays.size());
         } else {
             display.setItemStack(visual);
+            plugin.getLogger().info("[BackpackDisplayManager] Display ACTUALIZADO para " + player.getName()
+                    + " (tier=" + tier.getId() + ")");
         }
         updateTransform(player, display);
     }

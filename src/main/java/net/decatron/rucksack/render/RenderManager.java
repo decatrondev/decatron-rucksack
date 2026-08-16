@@ -116,6 +116,10 @@ public class RenderManager implements RucksackManager {
                 player.getInventory().setChestplate(inHand.clone());
                 inHand.subtract(1);
                 player.sendMessage("\u00a7aEquipaste tu " + tier.getDisplayName() + "\u00a7a.");
+                // Se llama directo ademas del PlayerArmorChangeEvent \u2014 ese evento
+                // no siempre dispara cuando el chestplate se setea por API en vez
+                // de por click/drag del jugador.
+                plugin.getPluginCore().getBackpackDisplayManager().spawnOrUpdate(player, tier);
             } else {
                 Optional<TierConfig> equippedOpt = BackpackItemUtil.getBackpackTier(chestSlot);
                 if (equippedOpt.isPresent()) {
