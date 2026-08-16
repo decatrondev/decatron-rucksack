@@ -9,13 +9,19 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.security.MessageDigest;
+import java.util.Enumeration;
 import java.util.concurrent.Executors;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class ResourcePackManager implements RucksackManager {
+
+    private static final String RESOURCEPACK_PREFIX = "resourcepack/";
 
     private final RucksackPlugin plugin;
     private final ConfigManager  configManager;
@@ -23,16 +29,6 @@ public class ResourcePackManager implements RucksackManager {
     private HttpServer httpServer;
     private String     url;
     private byte[]     sha1Bytes;
-
-    // Archivos del resource pack incluidos en el jar
-    private static final String[] RESOURCEPACK_FILES = {
-        "resourcepack/pack.mcmeta",
-        "resourcepack/assets/minecraft/models/item/paper.json",
-        "resourcepack/assets/decatron/models/item/backpack_leather.json",
-        "resourcepack/assets/decatron/models/item/backpack_iron.json",
-        "resourcepack/assets/decatron/models/item/backpack_diamond.json",
-        "resourcepack/assets/decatron/models/item/backpack_netherite.json"
-    };
 
     public ResourcePackManager(RucksackPlugin plugin, ConfigManager configManager) {
         this.plugin        = plugin;
@@ -107,22 +103,37 @@ public class ResourcePackManager implements RucksackManager {
     // Internos
     // -------------------------------------------------------------------------
 
-    private void extractResourcePack(File rpDir) throws IOException {
-        for (String resourcePath : RESOURCEPACK_FILES) {
-            File dest = new File(plugin.getDataFolder().getPath() + "/" + resourcePath);
-            if (!dest.getParentFile().exists()) {
-                dest.getParentFile().mkdirs();
-            }
-            // Siempre sobreescribir para tener la version mas actualizada del jar
-            try (InputStream in = plugin.getResource(resourcePath)) {
-                if (in == null) {
-                    plugin.getLogger().warning("[ResourcePackManager] Recurso no encontrado en jar: " + resourcePath);
+    /**
+     * Extrae TODO lo que haya bajo resourcepack/ dentro del jar del plugin, sin lista hardcodeada.
+     * Asi cualquier modelo/textura nueva que se agregue a src/main/resources/resourcepack/
+     * se empaqueta automaticamente sin tocar este archivo.
+     */
+    private void extractResourcePack(File rpDir) throws IOException, URISyntaxException {
+        File jarFile = new File(plugin.getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+        int extracted = 0;
+
+        try (JarFile jar = new JarFile(jarFile)) {
+            Enumeration<JarEntry> entries = jar.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (entry.isDirectory() || !name.startsWith(RESOURCEPACK_PREFIX)) {
                     continue;
                 }
-                Files.copy(in, dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+                File dest = new File(plugin.getDataFolder(), name);
+                dest.getParentFile().mkdirs();
+                try (InputStream in = jar.getInputStream(entry)) {
+                    Files.copy(in, dest.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                extracted++;
             }
         }
-        plugin.getLogger().info("[ResourcePackManager] Archivos del resource pack extraidos en " + rpDir.getAbsolutePath());
+
+        if (extracted == 0) {
+            plugin.getLogger().warning("[ResourcePackManager] No se encontro ningun archivo bajo " + RESOURCEPACK_PREFIX + " en el jar.");
+        }
+        plugin.getLogger().info("[ResourcePackManager] " + extracted + " archivos del resource pack extraidos en " + rpDir.getAbsolutePath());
     }
 
     private void packResourcePack(File rpDir, File zipFile) throws IOException {
