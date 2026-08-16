@@ -1,0 +1,29 @@
+{
+  "model": {
+    "type": "minecraft:range_dispatch",
+    "property": "minecraft:custom_model_data",
+    "index": 0,
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "minecraft:item/paper"
+    },
+    "entries": [
+      {
+        "threshold": 4001,
+        "model": {"type": "minecraft:model", "model": "decatron:item/backpack_leather"}
+      },
+      {
+        "threshold": 4002,
+        "model": {"type": "minecraft:model", "model": "decatron:item/backpack_iron"}
+      },
+      {
+        "threshold": 4003,
+        "model": {"type": "minecraft:model", "model": "decatron:item/backpack_diamond"}
+      },
+      {
+        "threshold": 4004,
+        "model": {"type": "minecraft:model", "model": "decatron:item/backpack_netherite"}
+      }
+    ]
+  }
+}
