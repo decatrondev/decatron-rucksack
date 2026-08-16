@@ -33,10 +33,17 @@ import java.util.UUID;
  * mueve junto a el de forma nativa, sin arrastre ni jitter por ping, y sin que
  * el servidor tenga que mandar un teletransporte por tick.
  *
- * Lo que el montaje NO resuelve son las poses: un pasajero sigue la POSICION de
- * la entidad, no la ANIMACION del modelo (que es puramente del cliente). Por eso
- * las poses en las que el cuerpo deja de estar vertical — planear, nadar,
- * agacharse — se aproximan a mano inclinando la mochila via Transformation.
+ * Lo que el montaje NO resuelve:
+ *
+ * 1. El GIRO. El cliente alinea al pasajero con el yaw de la camara, pero la
+ *    mochila va en el torso, que puede estar en diagonal respecto de la mirada.
+ *    Sin compensar esa diferencia la mochila orbita alrededor del jugador al
+ *    mover el mouse. Se corrige con getBodyYaw() via Transformation.
+ *
+ * 2. Las POSES. Un pasajero sigue la POSICION de la entidad, no la ANIMACION del
+ *    modelo (que es puramente del cliente). Por eso las poses en las que el
+ *    cuerpo deja de estar vertical — planear, nadar, agacharse — se aproximan a
+ *    mano inclinando la mochila.
  *
  * Nota: no se puede usar el sistema nativo de equipment (que si sigue el
  * esqueleto y resuelve todas las poses gratis) porque solo admite texturas
@@ -50,13 +57,15 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     private BukkitTask poseTask;
 
     /** Distancia hacia atras desde el punto de montaje (bloques). */
-    private static final float BACK_OFFSET = 0.28f;
+    private static final float BACK_OFFSET = 0.10f;
     /** Ajuste vertical desde el punto de montaje del pasajero. */
     private static final float HEIGHT_OFFSET = -0.35f;
     /** Escala del modelo sobre el cuerpo. */
     private static final float MODEL_SCALE = 0.85f;
     /** Giro fijo para que el frente del modelo apoye contra la espalda. */
     private static final float MODEL_FACING = 180f;
+    /** Diferencia de giro (grados) a partir de la cual vale reenviar la transformacion. */
+    private static final float YAW_EPSILON = 1.5f;
 
     public BackpackDisplayManager(RucksackPlugin plugin) {
         this.plugin = plugin;
@@ -65,9 +74,10 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     @Override
     public void initialize() {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        // Solo hace falta refrescar cuando cambia la POSE o el giro del cuerpo.
-        // La posicion la resuelve el cliente por el montaje, no este ciclo.
-        poseTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 2L, 2L);
+        // La POSICION la resuelve el cliente por el montaje; este ciclo solo
+        // corrige la ORIENTACION (torso vs camara) y la pose, y unicamente
+        // reenvia cuando alguna de las dos cambio de verdad.
+        poseTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
         plugin.getLogger().info("[BackpackDisplayManager] Inicializado (modo pasajero).");
     }
 
@@ -120,23 +130,31 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     }
 
     /**
-     * Coloca el modelo detras del punto de montaje y lo inclina segun la pose.
+     * Coloca el modelo detras del torso y lo inclina segun la pose.
      *
-     * Todo se expresa en el espacio LOCAL del jugador (+Z = hacia donde mira),
-     * porque al estar montada el cliente ya la gira junto con el cuerpo. Aplicar
-     * el yaw aca tambien lo duplicaba: la mochila terminaba de costado y al reves.
+     * El cliente ya gira al pasajero, pero lo hace con el yaw de la CAMARA, no
+     * con el del cuerpo. Como el torso puede estar en diagonal respecto de la
+     * mirada (mover el mouse quieto, o caminar de costado), hay que compensar la
+     * diferencia entre ambos o la mochila orbita alrededor del jugador.
+     *
+     * Un yaw de Minecraft equivale a un rotateY negado en JOML, por eso la
+     * compensacion es (camara - cuerpo) y no al reves.
      */
     private void applyTransformation(ItemDisplay display, PoseState state) {
         float height = HEIGHT_OFFSET + state.heightAdjust();
+        float phi = (float) Math.toRadians(state.yawDelta());
+
+        // La espalda del torso, girada desde el marco alineado a la camara.
+        Vector3f offset = new Vector3f(0f, height, -BACK_OFFSET).rotateY(phi);
 
         Quaternionf rotation = new Quaternionf()
-                .rotateY((float) Math.toRadians(MODEL_FACING))
+                .rotateY(phi + (float) Math.toRadians(MODEL_FACING))
                 .rotateX((float) Math.toRadians(state.pitchAdjust()));
 
         display.setInterpolationDelay(0);
         display.setInterpolationDuration(3);
         display.setTransformation(new Transformation(
-                new Vector3f(0f, height, -BACK_OFFSET),
+                offset,
                 rotation,
                 new Vector3f(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE),
                 new Quaternionf()
@@ -145,12 +163,18 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
 
     /**
      * Estado visual del jugador que obliga a recolocar la mochila.
-     * El giro del cuerpo no entra aca: lo resuelve el cliente por el montaje.
+     *
+     * yawDelta es cuanto esta girado el torso respecto de la camara: el montaje
+     * alinea la mochila con la camara, asi que esta diferencia es lo que hay que
+     * compensar para que quede pegada a la espalda y no orbitando.
      */
-    private record PoseState(boolean gliding, boolean swimming, boolean sneaking, boolean sleeping) {
+    private record PoseState(float yawDelta, boolean gliding, boolean swimming, boolean sneaking, boolean sleeping) {
 
         static PoseState of(Player player) {
+            float headYaw = player.getLocation().getYaw();
+            float bodyYaw = player.getBodyYaw();
             return new PoseState(
+                    normalize(headYaw - bodyYaw),
                     player.isGliding(),
                     player.isSwimming(),
                     player.isSneaking(),
@@ -159,7 +183,17 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
         }
 
         boolean differsFrom(PoseState other) {
-            return !equals(other);
+            return gliding != other.gliding
+                    || swimming != other.swimming
+                    || sneaking != other.sneaking
+                    || sleeping != other.sleeping
+                    || Math.abs(normalize(yawDelta - other.yawDelta)) > YAW_EPSILON;
+        }
+
+        private static float normalize(float degrees) {
+            while (degrees > 180f)  degrees -= 360f;
+            while (degrees < -180f) degrees += 360f;
+            return degrees;
         }
 
         /** Cuerpo horizontal (planear/nadar): la mochila se acuesta sobre la espalda. */
