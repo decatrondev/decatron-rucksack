@@ -5,7 +5,6 @@ import net.decatron.rucksack.RucksackPlugin;
 import net.decatron.rucksack.core.RucksackManager;
 import net.decatron.rucksack.util.BackpackItemUtil;
 import net.decatron.rucksack.util.TierConfig;
-import org.bukkit.Location;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
@@ -15,6 +14,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Transformation;
@@ -22,27 +22,42 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Muestra el modelo 3D real de la mochila enganchado a la espalda del jugador
- * usando un ItemDisplay que sigue su posicion/rotacion.
+ * Muestra el modelo 3D de la mochila en la espalda del jugador.
  *
- * Necesario porque el componente "equippable" de Minecraft NO soporta geometria
- * 3D custom en el cuerpo (solo re-texturiza siluetas fijas del juego: humanoid,
- * wings, wolf_body, etc). El "equippable" del item se deja solo para los stats
- * de armadura, no para el render visual.
+ * La entidad ItemDisplay se monta como PASAJERO del jugador: asi el cliente la
+ * mueve junto a el de forma nativa, sin arrastre ni jitter por ping, y sin que
+ * el servidor tenga que mandar un teletransporte por tick.
+ *
+ * Lo que el montaje NO resuelve son las poses: un pasajero sigue la POSICION de
+ * la entidad, no la ANIMACION del modelo (que es puramente del cliente). Por eso
+ * las poses en las que el cuerpo deja de estar vertical — planear, nadar,
+ * agacharse — se aproximan a mano inclinando la mochila via Transformation.
+ *
+ * Nota: no se puede usar el sistema nativo de equipment (que si sigue el
+ * esqueleto y resuelve todas las poses gratis) porque solo admite texturas
+ * sobre siluetas fijas, no geometria 3D propia.
  */
 public class BackpackDisplayManager implements RucksackManager, Listener {
 
     private final RucksackPlugin plugin;
     private final Map<UUID, ItemDisplay> displays = new HashMap<>();
-    private BukkitTask followTask;
+    private final Map<UUID, PoseState> lastState = new HashMap<>();
+    private BukkitTask poseTask;
 
-    private static final double BACK_OFFSET = 0.32;
-    private static final double HEIGHT_OFFSET = 1.25;
-    private static final double SNEAK_HEIGHT_DROP = 0.30;
+    /** Distancia hacia atras desde el punto de montaje (bloques). */
+    private static final float BACK_OFFSET = 0.28f;
+    /** Ajuste vertical desde el punto de montaje del pasajero. */
+    private static final float HEIGHT_OFFSET = -0.35f;
+    /** Escala del modelo sobre el cuerpo. */
+    private static final float MODEL_SCALE = 0.85f;
+
+    /** Umbral de giro (grados) para reenviar la transformacion. */
+    private static final float YAW_EPSILON = 2.0f;
 
     public BackpackDisplayManager(RucksackPlugin plugin) {
         this.plugin = plugin;
@@ -51,14 +66,16 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     @Override
     public void initialize() {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        followTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
-        plugin.getLogger().info("[BackpackDisplayManager] Inicializado.");
+        // Solo hace falta refrescar cuando cambia la POSE o el giro del cuerpo.
+        // La posicion la resuelve el cliente por el montaje, no este ciclo.
+        poseTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 2L, 2L);
+        plugin.getLogger().info("[BackpackDisplayManager] Inicializado (modo pasajero).");
     }
 
     @Override
     public void shutdown() {
-        if (followTask != null) {
-            followTask.cancel();
+        if (poseTask != null) {
+            poseTask.cancel();
         }
         for (ItemDisplay display : displays.values()) {
             if (display != null && !display.isDead()) {
@@ -66,75 +83,110 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
             }
         }
         displays.clear();
+        lastState.clear();
     }
 
     // -------------------------------------------------------------------------
-    // Ciclo de seguimiento
+    // Ciclo de poses
     // -------------------------------------------------------------------------
-
-    private int tickCounter = 0;
 
     private void tick() {
-        tickCounter++;
-        boolean logThisTick = (tickCounter % 100 == 0); // cada 5s aprox, solo mientras depuramos
-
-        if (logThisTick) {
-            plugin.getLogger().info("[BackpackDisplayManager] tick — mochilas activas: " + displays.size());
-        }
-
-        for (Map.Entry<UUID, ItemDisplay> entry : displays.entrySet()) {
+        Iterator<Map.Entry<UUID, ItemDisplay>> it = displays.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, ItemDisplay> entry = it.next();
             Player player = plugin.getServer().getPlayer(entry.getKey());
             ItemDisplay display = entry.getValue();
+
             if (player == null || !player.isOnline() || display == null || display.isDead()) {
-                if (logThisTick) {
-                    plugin.getLogger().warning("[BackpackDisplayManager] entrada invalida para " + entry.getKey()
-                            + " (player null/offline: " + (player == null || !player.isOnline())
-                            + ", display null/dead: " + (display == null || display.isDead()) + ")");
+                if (display != null && !display.isDead()) {
+                    display.remove();
                 }
+                lastState.remove(entry.getKey());
+                it.remove();
                 continue;
             }
-            updateTransform(player, display);
-            if (logThisTick) {
-                plugin.getLogger().info("[BackpackDisplayManager] " + player.getName()
-                        + " en " + formatLoc(player.getLocation())
-                        + " -> display en " + formatLoc(display.getLocation()));
+
+            // Si algo lo desmonto (dimension, /ride, muerte), volver a engancharlo.
+            if (!player.equals(display.getVehicle())) {
+                player.addPassenger(display);
+            }
+
+            PoseState current = PoseState.of(player);
+            PoseState previous = lastState.get(player.getUniqueId());
+            if (previous == null || previous.differsFrom(current)) {
+                applyTransformation(display, current);
+                lastState.put(player.getUniqueId(), current);
             }
         }
     }
 
-    private String formatLoc(Location loc) {
-        return String.format("(%.2f, %.2f, %.2f) yaw=%.1f", loc.getX(), loc.getY(), loc.getZ(), loc.getYaw());
-    }
+    /**
+     * Coloca el modelo detras del punto de montaje y lo inclina segun la pose.
+     * La entidad se deja con giro 0, asi el espacio local coincide con el del
+     * mundo y toda la orientacion vive en la Transformation.
+     */
+    private void applyTransformation(ItemDisplay display, PoseState state) {
+        double yawRad = Math.toRadians(state.yaw);
 
-    private void updateTransform(Player player, ItemDisplay display) {
-        Location loc = player.getLocation();
-        float yaw = loc.getYaw();
-        double yawRad = Math.toRadians(yaw);
+        // Direccion "hacia adelante" del jugador: (-sin, cos). La espalda es la opuesta.
+        float backX = (float) (Math.sin(yawRad) * BACK_OFFSET);
+        float backZ = (float) (-Math.cos(yawRad) * BACK_OFFSET);
 
-        double backX = -Math.sin(yawRad) * BACK_OFFSET;
-        double backZ = Math.cos(yawRad) * BACK_OFFSET;
-        double height = player.isSneaking() ? (HEIGHT_OFFSET - SNEAK_HEIGHT_DROP) : HEIGHT_OFFSET;
+        float height = HEIGHT_OFFSET + state.heightAdjust();
 
-        Location target = loc.clone().add(backX, height, backZ);
-        target.setYaw(yaw);
-        target.setPitch(0f);
+        Quaternionf rotation = new Quaternionf()
+                .rotateY((float) Math.toRadians(-state.yaw))
+                .rotateX((float) Math.toRadians(state.pitchAdjust()));
 
-        if (display.getInterpolationDuration() != 3) {
-            display.setInterpolationDuration(3);
-            display.setInterpolationDelay(0);
-            display.setTeleportDuration(3);
-        }
-        display.teleport(target);
-
-        // El giro visual del modelo se hace via Transformation, no via yaw de la entidad
-        // (los Display entities ignoran su propio yaw/pitch para el render del item).
-        Quaternionf rotation = new Quaternionf().rotateY((float) Math.toRadians(180 - yaw));
+        display.setInterpolationDelay(0);
+        display.setInterpolationDuration(3);
         display.setTransformation(new Transformation(
-                new Vector3f(0f, 0f, 0f),
+                new Vector3f(backX, height, backZ),
                 rotation,
-                new Vector3f(1f, 1f, 1f),
+                new Vector3f(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE),
                 new Quaternionf()
         ));
+    }
+
+    /** Estado visual relevante del jugador para posicionar la mochila. */
+    private record PoseState(float yaw, boolean gliding, boolean swimming, boolean sneaking, boolean sleeping) {
+
+        static PoseState of(Player player) {
+            return new PoseState(
+                    player.getLocation().getYaw(),
+                    player.isGliding(),
+                    player.isSwimming(),
+                    player.isSneaking(),
+                    player.isSleeping()
+            );
+        }
+
+        boolean differsFrom(PoseState other) {
+            return gliding != other.gliding
+                    || swimming != other.swimming
+                    || sneaking != other.sneaking
+                    || sleeping != other.sleeping
+                    || Math.abs(normalize(yaw - other.yaw)) > YAW_EPSILON;
+        }
+
+        private static float normalize(float degrees) {
+            while (degrees > 180f)  degrees -= 360f;
+            while (degrees < -180f) degrees += 360f;
+            return degrees;
+        }
+
+        /** Cuerpo horizontal (planear/nadar): la mochila se acuesta sobre la espalda. */
+        float pitchAdjust() {
+            if (gliding || swimming) return -90f;
+            if (sneaking)            return -25f;
+            return 0f;
+        }
+
+        float heightAdjust() {
+            if (gliding || swimming) return 0.30f;
+            if (sneaking)            return -0.15f;
+            return 0f;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -151,20 +203,22 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
                 d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
                 d.setBillboard(Display.Billboard.FIXED);
                 d.setPersistent(false);
+                d.setViewRange(0.6f);
             });
             displays.put(player.getUniqueId(), display);
-            plugin.getLogger().info("[BackpackDisplayManager] Display CREADO para " + player.getName()
-                    + " (tier=" + tier.getId() + "), total activos: " + displays.size());
+            player.addPassenger(display);
         } else {
             display.setItemStack(visual);
-            plugin.getLogger().info("[BackpackDisplayManager] Display ACTUALIZADO para " + player.getName()
-                    + " (tier=" + tier.getId() + ")");
         }
-        updateTransform(player, display);
+
+        PoseState state = PoseState.of(player);
+        applyTransformation(display, state);
+        lastState.put(player.getUniqueId(), state);
     }
 
     public void remove(Player player) {
         ItemDisplay display = displays.remove(player.getUniqueId());
+        lastState.remove(player.getUniqueId());
         if (display != null && !display.isDead()) {
             display.remove();
         }
@@ -201,5 +255,16 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDeath(PlayerDeathEvent event) {
         remove(event.getEntity());
+    }
+
+    /** Al reaparecer, si conserva la mochila puesta hay que volver a montarla. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!player.isOnline()) return;
+            BackpackItemUtil.getBackpackTier(player.getInventory().getChestplate())
+                    .ifPresent(tier -> spawnOrUpdate(player, tier));
+        }, 5L);
     }
 }
