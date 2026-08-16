@@ -9,19 +9,21 @@ import net.decatron.rucksack.license.LicenseManager;
 import net.decatron.rucksack.listeners.ListenerManager;
 import net.decatron.rucksack.render.ResourcePackManager;
 import net.decatron.rucksack.render.RenderManager;
+import net.decatron.rucksack.render.BackpackDisplayManager;
 
 public class PluginCore {
 
     private final RucksackPlugin plugin;
 
-    private final ConfigManager       configManager;
-    private final StorageManager      storageManager;
-    private final LicenseManager      licenseManager;
-    private final ResourcePackManager resourcePackManager;
-    private final GuiManager          guiManager;
-    private final RenderManager       renderManager;
-    private final ListenerManager     listenerManager;
-    private final CommandManager      commandManager;
+    private final ConfigManager          configManager;
+    private final StorageManager         storageManager;
+    private final LicenseManager         licenseManager;
+    private final ResourcePackManager    resourcePackManager;
+    private final GuiManager             guiManager;
+    private final RenderManager          renderManager;
+    private final BackpackDisplayManager backpackDisplayManager;
+    private final ListenerManager        listenerManager;
+    private final CommandManager         commandManager;
 
     public PluginCore(RucksackPlugin plugin) {
         this.plugin = plugin;
@@ -35,6 +37,7 @@ public class PluginCore {
 
         // RenderManager recibe configManager, resourcePackManager, guiManager y storageManager
         this.renderManager   = new RenderManager(plugin, configManager, resourcePackManager, guiManager, storageManager);
+        this.backpackDisplayManager = new BackpackDisplayManager(plugin);
 
         this.listenerManager = new ListenerManager(plugin);
         this.commandManager  = new CommandManager(plugin, guiManager, storageManager);
@@ -48,6 +51,7 @@ public class PluginCore {
         resourcePackManager.initialize();
         guiManager.initialize();
         renderManager.initialize();
+        backpackDisplayManager.initialize();
         listenerManager.initialize();
         commandManager.initialize();
         plugin.getLogger().info("PluginCore inicializado correctamente.");
@@ -57,6 +61,7 @@ public class PluginCore {
         plugin.getLogger().info("Apagando PluginCore...");
         commandManager.shutdown();
         listenerManager.shutdown();
+        backpackDisplayManager.shutdown();
         renderManager.shutdown();
         resourcePackManager.shutdown();
         guiManager.shutdown();
@@ -72,7 +77,8 @@ public class PluginCore {
     public LicenseManager      getLicenseManager()      { return licenseManager; }
     public ResourcePackManager getResourcePackManager() { return resourcePackManager; }
     public GuiManager          getGuiManager()          { return guiManager; }
-    public RenderManager       getRenderManager()       { return renderManager; }
+    public RenderManager          getRenderManager()          { return renderManager; }
+    public BackpackDisplayManager getBackpackDisplayManager() { return backpackDisplayManager; }
     public ListenerManager     getListenerManager()     { return listenerManager; }
     public CommandManager      getCommandManager()      { return commandManager; }
 }
