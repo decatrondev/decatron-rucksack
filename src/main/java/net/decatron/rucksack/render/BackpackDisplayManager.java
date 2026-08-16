@@ -55,9 +55,8 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     private static final float HEIGHT_OFFSET = -0.35f;
     /** Escala del modelo sobre el cuerpo. */
     private static final float MODEL_SCALE = 0.85f;
-
-    /** Umbral de giro (grados) para reenviar la transformacion. */
-    private static final float YAW_EPSILON = 2.0f;
+    /** Giro fijo para que el frente del modelo apoye contra la espalda. */
+    private static final float MODEL_FACING = 180f;
 
     public BackpackDisplayManager(RucksackPlugin plugin) {
         this.plugin = plugin;
@@ -122,38 +121,36 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
 
     /**
      * Coloca el modelo detras del punto de montaje y lo inclina segun la pose.
-     * La entidad se deja con giro 0, asi el espacio local coincide con el del
-     * mundo y toda la orientacion vive en la Transformation.
+     *
+     * Todo se expresa en el espacio LOCAL del jugador (+Z = hacia donde mira),
+     * porque al estar montada el cliente ya la gira junto con el cuerpo. Aplicar
+     * el yaw aca tambien lo duplicaba: la mochila terminaba de costado y al reves.
      */
     private void applyTransformation(ItemDisplay display, PoseState state) {
-        double yawRad = Math.toRadians(state.yaw);
-
-        // Direccion "hacia adelante" del jugador: (-sin, cos). La espalda es la opuesta.
-        float backX = (float) (Math.sin(yawRad) * BACK_OFFSET);
-        float backZ = (float) (-Math.cos(yawRad) * BACK_OFFSET);
-
         float height = HEIGHT_OFFSET + state.heightAdjust();
 
         Quaternionf rotation = new Quaternionf()
-                .rotateY((float) Math.toRadians(-state.yaw))
+                .rotateY((float) Math.toRadians(MODEL_FACING))
                 .rotateX((float) Math.toRadians(state.pitchAdjust()));
 
         display.setInterpolationDelay(0);
         display.setInterpolationDuration(3);
         display.setTransformation(new Transformation(
-                new Vector3f(backX, height, backZ),
+                new Vector3f(0f, height, -BACK_OFFSET),
                 rotation,
                 new Vector3f(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE),
                 new Quaternionf()
         ));
     }
 
-    /** Estado visual relevante del jugador para posicionar la mochila. */
-    private record PoseState(float yaw, boolean gliding, boolean swimming, boolean sneaking, boolean sleeping) {
+    /**
+     * Estado visual del jugador que obliga a recolocar la mochila.
+     * El giro del cuerpo no entra aca: lo resuelve el cliente por el montaje.
+     */
+    private record PoseState(boolean gliding, boolean swimming, boolean sneaking, boolean sleeping) {
 
         static PoseState of(Player player) {
             return new PoseState(
-                    player.getLocation().getYaw(),
                     player.isGliding(),
                     player.isSwimming(),
                     player.isSneaking(),
@@ -162,17 +159,7 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
         }
 
         boolean differsFrom(PoseState other) {
-            return gliding != other.gliding
-                    || swimming != other.swimming
-                    || sneaking != other.sneaking
-                    || sleeping != other.sleeping
-                    || Math.abs(normalize(yaw - other.yaw)) > YAW_EPSILON;
-        }
-
-        private static float normalize(float degrees) {
-            while (degrees > 180f)  degrees -= 360f;
-            while (degrees < -180f) degrees += 360f;
-            return degrees;
+            return !equals(other);
         }
 
         /** Cuerpo horizontal (planear/nadar): la mochila se acuesta sobre la espalda. */
