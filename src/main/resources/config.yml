@@ -20,12 +20,14 @@ language: es  # es | en
 #   /rucksack ajuste guardar    -> escribir los valores aca
 render:
   espalda:
-    separacion: 0.10   # distancia hacia atras desde la espalda
-    altura: 1.25       # altura desde los pies
+    separacion: 0.30   # distancia hacia atras desde la espalda
+    altura: 1.35       # altura desde los pies
     lateral: 0.0       # corrimiento a los costados (+ derecha, - izquierda)
-    escala: 0.85       # tamano del modelo
+    escala: 1.45       # tamano del modelo
     giro: 180.0        # orientacion, en grados
-    inclinacion: 0.0   # inclinacion hacia adelante/atras, en grados
+    inclinacion: 0.2   # inclinacion hacia adelante/atras, en grados
+    suavizado: 1       # ticks de interpolacion; subirlo la deja atrasada
+    prediccion: 1.0    # cuanto se adelanta al movimiento; 0 la desactiva
 
 resourcepack:
   enabled: true

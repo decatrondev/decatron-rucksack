@@ -54,10 +54,12 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     private final ConfigManager  configManager;
 
     private final Map<UUID, ItemDisplay> displays = new HashMap<>();
+    /** Ultima posicion conocida, para estimar hacia donde se esta moviendo. */
+    private final Map<UUID, Location> lastLocations = new HashMap<>();
     private BukkitTask followTask;
 
-    /** Ticks que el cliente usa para interpolar entre posiciones sucesivas. */
-    private static final int SMOOTHING_TICKS = 3;
+    /** Tope de correccion por prediccion, para que un teletransporte no la dispare lejos. */
+    private static final double MAX_PREDICTION = 0.6;
 
     public BackpackDisplayManager(RucksackPlugin plugin, ConfigManager configManager) {
         this.plugin        = plugin;
@@ -82,6 +84,7 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
             }
         }
         displays.clear();
+        lastLocations.clear();
     }
 
     // -------------------------------------------------------------------------
@@ -99,6 +102,7 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
                 if (display != null && !display.isDead()) {
                     display.remove();
                 }
+                lastLocations.remove(entry.getKey());
                 it.remove();
                 continue;
             }
@@ -150,10 +154,27 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
         target.setYaw(0f);
         target.setPitch(0f);
 
-        if (display.getTeleportDuration() != SMOOTHING_TICKS) {
-            display.setTeleportDuration(SMOOTHING_TICKS);
+        // El servidor siempre ve al jugador un paso atras de donde su cliente ya
+        // lo dibujo, y por eso al correr la mochila queda colgando atras. Se
+        // compensa adelantandola en la direccion en la que se venia moviendo.
+        Location previous = lastLocations.get(player.getUniqueId());
+        double pred = s.getPrediccion();
+        if (previous != null && pred > 0 && previous.getWorld() == playerLoc.getWorld()) {
+            double dx = clampPrediction((playerLoc.getX() - previous.getX()) * pred);
+            double dy = clampPrediction((playerLoc.getY() - previous.getY()) * pred);
+            double dz = clampPrediction((playerLoc.getZ() - previous.getZ()) * pred);
+            target.add(dx, dy, dz);
+        }
+        lastLocations.put(player.getUniqueId(), playerLoc.clone());
+
+        // El suavizado tiene que coincidir con cada cuanto actualizamos (1 tick).
+        // Si es mayor, la mochila nunca llega a destino: queda despegada al correr
+        // y trabada de costado al girar rapido.
+        int smoothing = s.getSuavizado();
+        if (display.getTeleportDuration() != smoothing) {
+            display.setTeleportDuration(smoothing);
             display.setInterpolationDelay(0);
-            display.setInterpolationDuration(SMOOTHING_TICKS);
+            display.setInterpolationDuration(smoothing);
         }
 
         display.teleport(target);
@@ -163,6 +184,10 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
                 new Vector3f(scale, scale, scale),
                 new Quaternionf()
         ));
+    }
+
+    private static double clampPrediction(double value) {
+        return Math.max(-MAX_PREDICTION, Math.min(MAX_PREDICTION, value));
     }
 
     /** Reaplica la colocacion ya mismo (usado tras cambiar un valor en vivo). */
@@ -198,6 +223,7 @@ public class BackpackDisplayManager implements RucksackManager, Listener {
     }
 
     public void remove(Player player) {
+        lastLocations.remove(player.getUniqueId());
         ItemDisplay display = displays.remove(player.getUniqueId());
         if (display != null && !display.isDead()) {
             display.remove();
